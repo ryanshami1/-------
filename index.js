@@ -15,23 +15,24 @@ client.on('ready', () => {
 });
 
 client.on('messageCreate', async (message) => {
-  // Ignore bot messages or non-text channels
   if (message.author.bot || message.channel.type !== ChannelType.GuildText) return;
 
   try {
-    const originalContent = message.content;
+    // Sanitize @everyone and @here by inserting a zero-width space after @
+    const sanitizedContent = message.content
+      .replace(/@everyone/g, '@\u200beveryone')
+      .replace(/@here/g, '@\u200bhere');
+
     const authorName = message.member?.displayName || message.author.username;
     const authorAvatar = message.member?.displayAvatarURL({ dynamic: true, size: 512 }) 
       || message.author.displayAvatarURL({ dynamic: true, size: 512 });
 
-    // Re-pack media files (videos, images) so Discord hosts them natively
     const files = message.attachments.map(
       (att) => new AttachmentBuilder(att.url, { name: att.name })
     );
 
     let footerLine = '';
 
-    // If message is a reply, append small subtext with message link (no ping)
     if (message.reference && message.reference.messageId) {
       try {
         const repliedMessage = await message.channel.messages.fetch(message.reference.messageId);
@@ -43,7 +44,6 @@ client.on('messageCreate', async (message) => {
       }
     }
 
-    // 1. Fetch or automatically create the channel webhook managed by the bot
     const webhooks = await message.channel.fetchWebhooks();
     let webhook = webhooks.find((wh) => wh.owner?.id === client.user.id);
 
@@ -54,16 +54,15 @@ client.on('messageCreate', async (message) => {
       });
     }
 
-    // 2. Send via Webhook using the sender's display name and avatar
+    // allowedMentions: { parse: [] } disables all ping parsing (@everyone, @here, roles, users)
     await webhook.send({
-      content: `${originalContent}${footerLine}`,
+      content: `${sanitizedContent}${footerLine}`,
       username: authorName,
       avatarURL: authorAvatar,
       files: files,
       allowedMentions: { parse: [] },
     });
 
-    // 3. Delete original message after webhook succeeds
     await message.delete();
 
   } catch (error) {
@@ -71,5 +70,4 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// Reads the token from your .env file locally or Railway's Environment Variables in production
 client.login(process.env.DISCORD_TOKEN);
