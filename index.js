@@ -17,12 +17,13 @@ client.on('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot || message.channel.type !== ChannelType.GuildText) return;
 
-  try {
-    // Sanitize @everyone and @here by inserting a zero-width space after @
-    const sanitizedContent = message.content
-      .replace(/@everyone/g, '@\u200beveryone')
-      .replace(/@here/g, '@\u200bhere');
+  // Block messages containing @everyone or @here entirely
+  if (message.content.includes('@everyone') || message.content.includes('@here')) {
+    return;
+  }
 
+  try {
+    const originalContent = message.content;
     const authorName = message.member?.displayName || message.author.username;
     const authorAvatar = message.member?.displayAvatarURL({ dynamic: true, size: 512 }) 
       || message.author.displayAvatarURL({ dynamic: true, size: 512 });
@@ -54,9 +55,8 @@ client.on('messageCreate', async (message) => {
       });
     }
 
-    // allowedMentions: { parse: [] } disables all ping parsing (@everyone, @here, roles, users)
     await webhook.send({
-      content: `${sanitizedContent}${footerLine}`,
+      content: `${originalContent}${footerLine}`,
       username: authorName,
       avatarURL: authorAvatar,
       files: files,
